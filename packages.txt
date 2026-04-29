@@ -1,0 +1,3 @@
+libglu1-mesa
+libcursor1
+libxinerama1

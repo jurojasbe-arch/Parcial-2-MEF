@@ -1,0 +1,7 @@
+streamlit
+numpy
+scikit-fem
+gmsh
+plotly
+meshio
+scipy

@@ -5,8 +5,9 @@ from skfem.models.poisson import laplace
 from scipy.sparse.linalg import spsolve
 
 def resolver_mef_presa(Lx, prof_muro, pos_muro, h1, h2, k_suelo, d_global, d_critica):
-    gmsh.initialize()
+    gmsh.initialize(interruptible=False)
     gmsh.model.add("MEF_Geotecnia")
+    # ...
 
     # Geometría del Dominio (30m de profundidad)
     p1 = gmsh.model.geo.addPoint(0, 0, 0, d_global)

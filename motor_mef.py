@@ -23,13 +23,23 @@ def resolver_mef_presa(Lx, prof_muro, pos_muro, h1, h2, k_suelo, gs, e_vacios):
     # Identificamos los elementos que caen dentro del empotramiento de la presa (y=25 a y=30)
     excavacion_presa = (cx >= x_inicio) & (cx <= x_fin) & (cy >= 25.0)
     
-    # Identificamos los elementos de la tablestaca (grosor de 0.4m para exactitud nodal)
+    # Identificamos los elementos de la tablestaca
     excavacion_muro = (cx >= x_muro - 0.2) & (cx <= x_muro + 0.2) & (cy >= 25.0 - prof_muro)
     
     # Conservamos únicamente los elementos que son "Suelo"
     elementos_suelo = ~(excavacion_presa | excavacion_muro)
-    m = MeshQuad(m.p, m.t[:, elementos_suelo])
-    m = m.remove_orphans()  # Limpia los nodos que quedaron flotando
+    t_suelo = m.t[:, elementos_suelo]
+    
+    # --- FIX: LIMPIEZA MANUAL DE NODOS HUÉRFANOS (Matemática pura, sin depender de la librería) ---
+    nodos_activos = np.unique(t_suelo) # Encuentra los nodos que realmente se están usando
+    mapa_nodos = np.zeros(m.p.shape[1], dtype=np.int64) - 1
+    mapa_nodos[nodos_activos] = np.arange(len(nodos_activos)) # Crea un nuevo índice secuencial
+    
+    p_nuevo = m.p[:, nodos_activos] # Filtra las coordenadas
+    t_nuevo = mapa_nodos[t_suelo]   # Reasigna los elementos a las nuevas coordenadas
+    
+    m = MeshQuad(p_nuevo, t_nuevo)  # Construye la malla limpia definitiva
+    # ---------------------------------------------------------------------------------------------
     
     basis = Basis(m, ElementQuad1())
 

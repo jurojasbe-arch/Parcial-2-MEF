@@ -73,16 +73,26 @@ with tab1:
     ax1.set_title('Red de Flujo: Malla MEF, Equipotenciales y Líneas de Corriente')
     ax1.set_ylabel('Elevación (m)')
     
-    # --- GRÁFICO 2: Mapa de Calor Vectorial ---
-    cf2 = ax2.tricontourf(triang, res['imag'], levels=np.linspace(0, res['ic']*1.2, 50), cmap='turbo', extend='max')
+    # --- GRÁFICO 2: Mapa de Calor Vectorial Suavizado ---
+    # En lugar de dibujar la malla cruda (que se ve rota por las derivadas), 
+    # interpolamos los gradientes a la misma cuadrícula fina y suave de las líneas de flujo.
+    
+    interp_imag = mtri.LinearTriInterpolator(triang, res['imag'])
+    imag_grid = interp_imag(xi, yi)
+    
+    # Enmascaramos la presa y tablestaca
+    imag_grid = np.ma.masked_where(mask_presa | mask_muro, imag_grid)
+    
+    # Usamos contourf normal (sobre la grilla regular) en lugar de tricontourf
+    cf2 = ax2.contourf(xi, yi, imag_grid, levels=np.linspace(0, res['ic']*1.2, 50), cmap='turbo', extend='max')
     plt.colorbar(cf2, ax=ax2, label='Gradiente Hidráulico (i)')
     
     ax2.fill([x_i, x_f, x_f, x_i], [25, 25, 30, 30], color='#444444', zorder=10)
     if prof_muro > 0:
         ax2.fill([x_m-0.1, x_m+0.1, x_m+0.1, x_m-0.1], [25-prof_muro, 25-prof_muro, 25, 25], color='#222222', zorder=10)
         
-    ax2.tricontour(triang, res['imag'], levels=[res['ic']], colors='red', linewidths=2.5, linestyles='dashed')
-    ax2.set_title('Concentración de Gradientes: El Rojo Indica Peligro de Tubificación')
+    ax2.contour(xi, yi, imag_grid, levels=[res['ic']], colors='red', linewidths=2.5, linestyles='dashed')
+    ax2.set_title('Concentración de Gradientes (Campo Vectorial Interpolado)')
     ax2.set_xlabel('Posición X (m)')
     ax2.set_ylabel('Elevación (m)')
 

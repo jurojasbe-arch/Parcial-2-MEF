@@ -3,9 +3,18 @@ import numpy as np
 from skfem import *
 from skfem.models.poisson import laplace
 from scipy.sparse.linalg import spsolve
+import signal
 
 def resolver_mef_presa(Lx, prof_muro, pos_muro, h1, h2, k_suelo, d_global, d_critica):
-    gmsh.initialize(interruptible=False)
+    
+    # --- FIX DEFINITIVO PARA STREAMLIT (Monkey Patch) ---
+    original_signal = signal.signal
+    signal.signal = lambda *args, **kwargs: None
+    try:
+        gmsh.initialize()
+    finally:
+        signal.signal = original_signal
+    # ----------------------------------------------------
     gmsh.model.add("MEF_Geotecnia")
     # ...
 

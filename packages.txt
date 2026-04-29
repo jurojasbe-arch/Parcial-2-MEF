@@ -1,3 +1,5 @@
 libglu1-mesa
-libcursor1
+libxcursor1
 libxinerama1
+libxrender1
+libxft2

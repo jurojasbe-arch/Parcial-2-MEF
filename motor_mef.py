@@ -98,14 +98,16 @@ def resolver_mef_presa(Lx, prof_muro, pos_muro, h1, h2, k_suelo, d_global, d_cri
     # 8. Ensamblaje y Física
     K = asm(laplace, basis) * k_suelo
     
-    dofs_h1 = m.nodes_satisfying(lambda x: (x[0] <= x_inicio + 0.01) & (x[1] >= 29.9))
-    dofs_h2 = m.nodes_satisfying(lambda x: (x[0] >= x_fin - 0.01) & (x[1] >= 29.9))
+    # Física Mejorada: Extraemos los Grados de Libertad (DOFs) correctos
+    dofs_h1 = basis.get_dofs(lambda x: (x[0] <= x_inicio + 0.01) & (x[1] >= 29.9)).all()
+    dofs_h2 = basis.get_dofs(lambda x: (x[0] >= x_fin - 0.01) & (x[1] >= 29.9)).all()
     
-    h = np.zeros(m.nverts)
+    # Inicializamos vectores usando basis.N (Total de grados de libertad matemáticos)
+    h = np.zeros(basis.N)
     h[dofs_h1] = h1
     h[dofs_h2] = h2
     
     frontera = np.union1d(dofs_h1, dofs_h2)
-    h_sol = solve(*condense(K, np.zeros(m.nverts), h, D=frontera))
+    h_sol = solve(*condense(K, np.zeros(basis.N), h, D=frontera))
 
     return m, h_sol

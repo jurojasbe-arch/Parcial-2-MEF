@@ -67,9 +67,12 @@ def resolver_mef_presa(Lx, prof_muro, pos_muro, h1, h2, k_suelo, d_global, d_cri
     h_sol = solve(*condense(K, np.zeros(basis.N), h, D=np.union1d(dofs_h1, dofs_h2)))
 
     # Post-proceso: Gradientes (Calculados por elemento y promediados a nodos)
-    # i = -grad(h)
-    grad_h = basis.project(basis.interpolate(h_sol).grad)
-    ix, iy = -grad_h[0], -grad_h[1]
+    # Extraemos el gradiente matemático
+    grad_eval = basis.interpolate(h_sol).grad
+    
+    # Proyectamos cada componente (X e Y) por separado para evitar el error dimensional
+    ix = -basis.project(grad_eval[0])
+    iy = -basis.project(grad_eval[1])
     imag = np.sqrt(ix**2 + iy**2)
 
     # Caudal Q (Integral de flujo en la entrada x=0)

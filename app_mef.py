@@ -109,33 +109,33 @@ with tab3:
 with tab4:
     st.header("📄 Memoria de Cálculo y Marco Teórico MEF")
     
-    st.markdown("""
+    st.markdown(r"""
     El método desarrollado resuelve el campo bidimensional de presiones intersticiales empleando el **Método de los Elementos Finitos (MEF)** bajo una formulación tensorial estricta, lo que garantiza resultados numéricos superiores a los esquemas clásicos de Diferencias Finitas.
     """)
     
     st.subheader("1. Ecuación Gobernante y Régimen de Flujo")
-    st.markdown("La filtración de fluidos en un medio poroso isotrópico y homogéneo bajo un régimen laminar obedece a la integración de la Ley de Darcy junto con la ecuación de conservación de masa, dando como resultado la Ecuación Diferencial Parcial (EDP) de Laplace:")
+    st.markdown(r"La filtración de fluidos en un medio poroso isotrópico y homogéneo bajo un régimen laminar obedece a la integración de la Ley de Darcy junto con la ecuación de conservación de masa, dando como resultado la Ecuación Diferencial Parcial (EDP) de Laplace:")
     st.latex(r"\nabla \cdot (k \nabla h) = 0 \quad \Rightarrow \quad \frac{\partial^2 h}{\partial x^2} + \frac{\partial^2 h}{\partial y^2} = 0")
     
     st.subheader("2. Formulación Débil (Método de Galerkin)")
-    st.markdown("Dado que la solución analítica exacta de la EDP es imposible para geometrías complejas (como la inclusión asimétrica de una tablestaca), se procede a la minimización del error residual. Multiplicando por una función de peso $v(x,y)$ e integrando por partes en el dominio $\Omega$ usando el Teorema de Green, obtenemos la forma variacional débil:")
+    st.markdown(r"Dado que la solución analítica exacta de la EDP es imposible para geometrías complejas (como la inclusión asimétrica de una tablestaca), se procede a la minimización del error residual. Multiplicando por una función de peso $v(x,y)$ e integrando por partes en el dominio $\Omega$ usando el Teorema de Green, obtenemos la forma variacional débil:")
     st.latex(r"\int_{\Omega} \left( \frac{\partial v}{\partial x} k \frac{\partial h}{\partial x} + \frac{\partial v}{\partial y} k \frac{\partial h}{\partial y} \right) d\Omega = \int_{\Gamma_q} v \bar{q} d\Gamma")
-    st.markdown("En este proyecto, las fronteras laterales y de fondo se asumen impermeables, por lo que el término de flujo natural en la frontera Neumann $\int_{\Gamma_q}$ se vuelve idéntico a cero.")
+    st.markdown(r"En este proyecto, las fronteras laterales y de fondo se asumen impermeables, por lo que el término de flujo natural en la frontera Neumann $\int_{\Gamma_q}$ se vuelve idéntico a cero.")
 
     st.subheader("3. Discretización Espacial y Funciones de Forma")
-    st.markdown("El medio se discretizó mediante una grilla tensorial estructurada conformada estrictamente por **elementos cuadriláteros bilineales de 4 nodos (Quad-4)**. La variable de estado $h$ dentro de cada elemento $e$ se interpola de sus valores nodales usando funciones de forma isoparamétricas $N_i(\xi, \eta)$:")
+    st.markdown(r"El medio se discretizó mediante una grilla tensorial estructurada conformada estrictamente por **elementos cuadriláteros bilineales de 4 nodos (Quad-4)**. La variable de estado $h$ dentro de cada elemento $e$ se interpola de sus valores nodales usando funciones de forma isoparamétricas $N_i(\xi, \eta)$:")
     st.latex(r"h^{(e)}(\xi, \eta) \approx \sum_{i=1}^{4} N_i(\xi, \eta) h_i \quad ; \quad N_i = \frac{1}{4}(1 \pm \xi)(1 \pm \eta)")
 
     st.subheader("4. Matriz Jacobiana e Integración Numérica")
-    st.markdown("Para integrar sobre cuadriláteros deformados topológicamente, se mapea el espacio físico $(x,y)$ al espacio natural $(\xi, \eta)$ utilizando la Matriz Jacobiana $[J]$. La matriz de rigidez hidráulica del elemento $[K_e]$ se obtiene numéricamente (mediante Cuadratura de Gauss):")
+    st.markdown(r"Para integrar sobre cuadriláteros deformados topológicamente, se mapea el espacio físico $(x,y)$ al espacio natural $(\xi, \eta)$ utilizando la Matriz Jacobiana $[J]$. La matriz de rigidez hidráulica del elemento $[K_e]$ se obtiene numéricamente (mediante Cuadratura de Gauss):")
     st.latex(r"[K^{(e)}] = \int_{-1}^{1} \int_{-1}^{1} [B]^T k [B] \cdot \det|J| \, d\xi \, d\eta")
-    st.markdown("Donde $[B]$ es la matriz que contiene las derivadas espaciales de las funciones de forma $\\nabla N_i$.")
+    st.markdown(r"Donde $[B]$ es la matriz que contiene las derivadas espaciales de las funciones de forma $\nabla N_i$.")
 
     st.subheader("5. Topología de Excavación Booleana y Ensamblaje")
-    st.markdown("A diferencia de programas comerciales estándar, este algoritmo crea una red densa y posteriormente ejecuta una **operación booleana de substracción**, eliminando físicamente los elementos que interfieren con la cimentación de la presa y el grosor de la tablestaca. Tras la eliminación de los nodos huérfanos, las matrices locales se acoplan en la Matriz Global de Rigidez $[K]$ de tamaño $(n \times n)$ grados de libertad.")
+    st.markdown(r"A diferencia de programas comerciales estándar, este algoritmo crea una red densa y posteriormente ejecuta una **operación booleana de substracción**, eliminando físicamente los elementos que interfieren con la cimentación de la presa y el grosor de la tablestaca. Tras la eliminación de los nodos huérfanos, las matrices locales se acoplan en la Matriz Global de Rigidez $[K]$ de tamaño $(n \times n)$ grados de libertad.")
 
     st.subheader("6. Solución del Sistema y Post-Procesamiento Vectorial")
-    st.markdown("Imponiendo las condiciones de frontera de Dirichlet (Cargas $H_1$ y $H_2$ en la superficie), se resuelve el sistema de ecuaciones algebraicas:")
+    st.markdown(r"Imponiendo las condiciones de frontera de Dirichlet (Cargas $H_1$ y $H_2$ en la superficie), se resuelve el sistema de ecuaciones algebraicas:")
     st.latex(r"[K_{ff}] \{H_f\} = \{F\} - [K_{fc}] \{H_c\} \quad \Rightarrow \quad \{H_f\} = [K_{ff}]^{-1} (\{F\} - [K_{fc}] \{H_c\})")
-    st.markdown("Finalmente, los vectores de gradiente local se recuperan proyectando la matriz de derivadas sobre el campo de presiones resuelto, y el caudal de infiltración exacto $Q$ se extrae sumando la matriz de fuerzas de reacción nodales en el lecho aguas arriba, garantizando la conservación perfecta de masa:")
+    st.markdown(r"Finalmente, los vectores de gradiente local se recuperan proyectando la matriz de derivadas sobre el campo de presiones resuelto, y el caudal de infiltración exacto $Q$ se extrae sumando la matriz de fuerzas de reacción nodales en el lecho aguas arriba, garantizando la conservación perfecta de masa:")
     st.latex(r"\mathbf{i} = - \nabla h = - [B]\{H\} \quad ; \quad Q = \sum | \{R_{inlet}\} |")

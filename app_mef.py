@@ -38,14 +38,10 @@ tab1, tab2, tab3, tab4 = st.tabs(["📊 Red de Flujo y Malla", "🧊 Modelo 3D F
 Lx, x_i, x_f, x_m, prof_muro, grosor = res['params']
 
 with tab1:
-    triang = mtri.Triangulation(res['mesh'].p[0], res['mesh'].p[1])
-    x_tri = res['mesh'].p[0, triang.triangles].mean(axis=1)
-    y_tri = res['mesh'].p[1, triang.triangles].mean(axis=1)
-    
-    # Máscara estricta booleana para los gráficos
-    mask_presa = (x_tri >= x_i) & (x_tri <= x_f) & (y_tri >= 25.0)
-    mask_muro = (x_tri >= x_m - grosor/2) & (x_tri <= x_m + grosor/2) & (y_tri >= 25.0 - prof_muro)
-    triang.set_mask(mask_presa | mask_muro)
+    # EL FIX ABSOLUTO: Obligar a Matplotlib a respetar los cuadriláteros (SIN inventar triángulos en los huecos)
+    t_quads = res['mesh'].t.T
+    triangles = np.vstack([t_quads[:, [0, 1, 2]], t_quads[:, [0, 2, 3]]])
+    triang = mtri.Triangulation(res['mesh'].p[0], res['mesh'].p[1], triangles)
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
     
@@ -57,25 +53,17 @@ with tab1:
     interp_ix = mtri.LinearTriInterpolator(triang, res['ix'])
     interp_iy = mtri.LinearTriInterpolator(triang, res['iy'])
     
-    ix_grid = interp_ix(xi, yi)
-    iy_grid = interp_iy(xi, yi)
-    
-    # Prohibimos a las flechas dibujarse sobre el concreto/acero
-    mask_grid_obstaculo = ((xi >= x_i) & (xi <= x_f) & (yi >= 25.0)) | ((xi >= x_m - grosor/2) & (xi <= x_m + grosor/2) & (yi >= 25.0 - prof_muro))
-    ix_grid = np.ma.masked_where(mask_grid_obstaculo, ix_grid)
-    iy_grid = np.ma.masked_where(mask_grid_obstaculo, iy_grid)
-    
-    ax1.streamplot(xi, yi, ix_grid, iy_grid, color='darkblue', linewidth=1.0, density=1.8)
+    # Al no haber triángulos en la tablestaca, la interpolación arroja NaN automáticamente y las flechas la rodean
+    ax1.streamplot(xi, yi, interp_ix(xi, yi), interp_iy(xi, yi), color='darkblue', linewidth=1.0, density=1.8)
     
     verts = res['mesh'].p[:, res['mesh'].t].T
     ax1.add_collection(PolyCollection(verts, edgecolors='black', facecolors='none', linewidths=0.2, alpha=0.4))
     
     ax1.fill([x_i, x_f, x_f, x_i], [25, 25, 30, 30], color='#444444', zorder=10)
     if prof_muro > 0: ax1.fill([x_m-grosor/2, x_m+grosor/2, x_m+grosor/2, x_m-grosor/2], [25-prof_muro, 25-prof_muro, 25, 25], color='#222222', zorder=10)
-    ax1.set_title('Malla Estructurada Cuadriculada con Equipotenciales y Líneas de Flujo')
+    ax1.set_title('Malla Estructurada Topológica: El agua rodea físicamente el obstáculo')
     
-    # Gráfico B: Mapa de Gradientes Exacto usando Triangulación
-    # Esto garantiza que el calor nazca EXACTAMENTE en la punta del muro
+    # Gráfico B: Mapa de Gradientes Exacto
     cf2 = ax2.tricontourf(triang, res['imag'], levels=np.linspace(0, res['ic']*1.5, 50), cmap='turbo', extend='max')
     plt.colorbar(cf2, ax=ax2, label='Gradiente Hidráulico (i)')
     ax2.tricontour(triang, res['imag'], levels=[res['ic']], colors='red', linewidths=2.5, linestyles='dashed')
@@ -91,46 +79,36 @@ with tab2:
     st.subheader("Modelación CAD Física en 3D con Flujo Mapeado")
     fig3d = go.Figure()
 
-    # Mapeo del calor (presiones) directamente sobre las caras usando la triangulación física
-    x_nodos = res['mesh'].p[0]
-    y_nodos = res['mesh'].p[1]
-    h_nodos = res['h']
-    tris = triang.triangles
+    # Función para inyectar cortes transversales del campo de presiones en 3D
+    def agregar_corte_flujo(depth_y, show_colorbar):
+        fig3d.add_trace(go.Mesh3d(
+            x=res['mesh'].p[0], y=np.full_like(res['mesh'].p[0], depth_y), z=res['mesh'].p[1],
+            i=triangles[:,0], j=triangles[:,1], k=triangles[:,2],
+            intensity=res['h'], colorscale='Turbo', showscale=show_colorbar, name=f'Corte Flujo (Y={depth_y}m)'
+        ))
 
-    # Cara Frontal (Z = 0) dibujando la presión
-    fig3d.add_trace(go.Mesh3d(
-        x=x_nodos, y=np.zeros_like(x_nodos), z=y_nodos,
-        i=tris[:, 0], j=tris[:, 1], k=tris[:, 2],
-        intensity=h_nodos, colorscale='Blues', showscale=True, name='Frente (Flujo)'
-    ))
-    
-    # Cara Trasera (Z = Ancho)
-    fig3d.add_trace(go.Mesh3d(
-        x=x_nodos, y=np.full_like(x_nodos, ancho_3d), z=y_nodos,
-        i=tris[:, 0], j=tris[:, 1], k=tris[:, 2],
-        intensity=h_nodos, colorscale='Blues', showscale=False, name='Fondo (Flujo)'
-    ))
+    # Generamos 3 tajadas para visualizar el flujo dentro del volumen
+    agregar_corte_flujo(0, True)
+    agregar_corte_flujo(ancho_3d / 2, False)
+    agregar_corte_flujo(ancho_3d, False)
 
     # Creador de bloques de concreto/acero 3D
-    def crear_bloque(x0, x1, y0, y1, z0, z1, color, nombre):
+    def crear_bloque(x0, x1, elev0, elev1, depth0, depth1, color, nombre):
         return go.Mesh3d(
-            x=[x0, x0, x1, x1, x0, x0, x1, x1], y=[y0, y1, y1, y0, y0, y1, y1, y0], z=[z0, z0, z0, z0, z1, z1, z1, z1],
+            x=[x0, x0, x1, x1, x0, x0, x1, x1], y=[depth0, depth0, depth0, depth0, depth1, depth1, depth1, depth1], z=[elev0, elev1, elev1, elev0, elev0, elev1, elev1, elev0],
             alphahull=0, color=color, flatshading=True, name=nombre
         )
 
-    # Estructuras
-    fig3d.add_trace(crear_bloque(x_i, x_f, 0, ancho_3d, 25, 30, '#888888', 'Presa de Concreto'))
-    if prof_muro > 0: fig3d.add_trace(crear_bloque(x_m-grosor/2, x_m+grosor/2, 0, ancho_3d, 25-prof_muro, 25, '#222222', 'Tablestaca de Acero'))
+    # Estructuras Físicas
+    fig3d.add_trace(crear_bloque(x_i, x_f, 25, 30, 0, ancho_3d, '#888888', 'Presa de Concreto'))
+    if prof_muro > 0: fig3d.add_trace(crear_bloque(x_m-grosor/2, x_m+grosor/2, 25-prof_muro, 25, 0, ancho_3d, '#222222', 'Tablestaca de Acero'))
 
     fig3d.update_layout(
         scene=dict(
-            xaxis_title='Longitud X (m)', 
-            yaxis_title='Ancho Z (m)', 
-            zaxis_title='Elevación Y (m)', 
+            xaxis_title='Longitud X (m)', yaxis_title='Profundidad / Ancho Z (m)', zaxis_title='Elevación (m)', 
             aspectmode='manual', aspectratio=dict(x=3, y=1.5, z=1)
         ), 
-        height=750, template="plotly_dark",
-        margin=dict(l=0, r=0, b=0, t=40)
+        height=750, template="plotly_dark", margin=dict(l=0, r=0, b=0, t=40)
     )
     st.plotly_chart(fig3d, use_container_width=True)
 
@@ -142,5 +120,27 @@ with tab3:
 
 with tab4:
     st.header("📄 Memoria de Cálculo y Marco Teórico MEF")
-    st.markdown(r"El método desarrollado resuelve el campo bidimensional de presiones intersticiales empleando el **Método de los Elementos Finitos (MEF)**...")
-    # ... (El texto teórico se mantiene idéntico al anterior)
+    
+    st.markdown(r"""
+El método desarrollado resuelve el campo bidimensional de presiones intersticiales empleando el **Método de los Elementos Finitos (MEF)** bajo una formulación tensorial estricta, lo que garantiza resultados numéricos superiores a los esquemas clásicos de Diferencias Finitas.
+
+### 1. Ecuación Gobernante y Régimen de Flujo
+La filtración de fluidos en un medio poroso isotrópico y homogéneo bajo un régimen laminar obedece a la integración de la Ley de Darcy junto con la ecuación de conservación de masa, dando como resultado la Ecuación Diferencial Parcial (EDP) de Laplace:
+$$ \nabla \cdot (k \nabla h) = 0 \quad \Rightarrow \quad \frac{\partial^2 h}{\partial x^2} + \frac{\partial^2 h}{\partial y^2} = 0 $$
+
+### 2. Formulación Débil (Método de Galerkin)
+Dado que la solución analítica exacta de la EDP es imposible para geometrías complejas (como la inclusión asimétrica de una tablestaca), se procede a la minimización del error residual. Multiplicando por una función de peso $v(x,y)$ e integrando por partes en el dominio $\Omega$ usando el Teorema de Green, obtenemos la forma variacional débil:
+$$ \int_{\Omega} \left( \frac{\partial v}{\partial x} k \frac{\partial h}{\partial x} + \frac{\partial v}{\partial y} k \frac{\partial h}{\partial y} \right) d\Omega = 0 $$
+En este proyecto, las fronteras laterales y de fondo se asumen impermeables, por lo que el término de flujo natural en la frontera Neumann se vuelve idéntico a cero.
+
+### 3. Discretización Espacial y Topología Booleana
+El medio se discretiza mediante una grilla tensorial estructurada conformada estrictamente por **elementos cuadriláteros bilineales de 4 nodos (Quad-4)**. 
+A diferencia de programas comerciales estándar, este algoritmo genera la matriz y posteriormente ejecuta una **operación booleana de substracción**, eliminando físicamente los elementos que interfieren con la cimentación de la presa y el grosor de la tablestaca. La variable de estado $h$ se interpola usando funciones de forma isoparamétricas $N_i(\xi, \eta)$:
+$$ h^{(e)}(\xi, \eta) \approx \sum_{i=1}^{4} N_i(\xi, \eta) h_i \quad ; \quad N_i = \frac{1}{4}(1 \pm \xi)(1 \pm \eta) $$
+
+### 4. Solución del Sistema y Caudal Exacto
+Las matrices locales se acoplan en la Matriz Global de Rigidez $[K]$. Imponiendo las cargas de frontera $H_1$ y $H_2$, se resuelve el sistema lineal:
+$$ [K_{ff}] \{H_f\} = \{F\} - [K_{fc}] \{H_c\} $$
+El caudal de infiltración exacto $Q$ se extrae sumando la matriz de fuerzas de reacción nodales en el lecho aguas arriba, garantizando la conservación perfecta de masa:
+$$ Q = \sum | \{R_{inlet}\} | $$
+    """)
